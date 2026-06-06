@@ -1,0 +1,1969 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小红书代理商数据看板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js">
+</script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f3f8;
+    --card-bg: #ffffff;
+    --primary: #5b5fcf;
+    --primary-light: #e8e7f7;
+    --accent: #7c6faa;
+    --text: #2d2b38;
+    --text-secondary: #6e6b7b;
+    --border: #e4e1ed;
+    --danger: #e05b6d;
+    --danger-bg: #fef0f3;
+    --success: #3da589;
+    --success-bg: #edf8f4;
+    --warning: #c4943e;
+    --warning-bg: #fdf7ed;
+    --shadow-sm: 0 1px 3px rgba(80,72,128,0.06);
+    --shadow-md: 0 4px 16px rgba(80,72,128,0.08);
+    --radius: 8px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .layout {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 220px;
+    background: #fff;
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .sidebar-logo {
+    padding: 0 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .sidebar-logo .dot {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+  }
+  .sidebar-logo span {
+    font-size: 15px; font-weight: 600; color: var(--text);
+  }
+  .sidebar-nav { flex: 1; padding: 8px 12px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: var(--radius);
+    font-size: 14px; color: var(--text-secondary); cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--primary-light); color: var(--primary); }
+  .nav-item.active { background: var(--primary-light); color: var(--primary); font-weight: 500; }
+  .nav-item svg { width: 18px; height: 18px; opacity: 0.7; }
+  .nav-item.active svg { opacity: 1; }
+
+  /* Main */
+  .main {
+    flex: 1; padding: 28px 32px; overflow-x: hidden;
+  }
+
+  /* Header */
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 28px;
+  }
+  .topbar h1 { font-size: 22px; font-weight: 600; color: var(--text); }
+  .topbar-right {
+    display: flex; align-items: center; gap: 16px;
+    font-size: 13px; color: var(--text-secondary);
+  }
+  .refresh-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--primary-light); color: var(--primary);
+    padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+  }
+  .refresh-badge svg { width: 14px; height: 14px; }
+
+  /* Summary Cards */
+  .summary-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 16px; margin-bottom: 24px;
+  }
+  .summary-card {
+    background: var(--card-bg); border-radius: var(--radius);
+    padding: 20px 24px; box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
+  }
+  .summary-card .label {
+    font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;
+  }
+  .summary-card .value {
+    font-size: 28px; font-weight: 700; color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .summary-card .value .unit { font-size: 14px; font-weight: 400; color: var(--text-secondary); margin-left: 2px; }
+  .summary-card .sub {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 8px; font-size: 12px;
+  }
+  .sub.up { color: var(--danger); }
+  .sub.down { color: var(--success); }
+  .sub .arrow { font-size: 14px; }
+
+  /* KPI Section */
+  .section-row {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 16px; margin-bottom: 24px;
+  }
+  .panel {
+    background: var(--card-bg); border-radius: var(--radius);
+    padding: 20px 24px; box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
+  }
+  .panel-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px;
+  }
+  .panel-title { font-size: 15px; font-weight: 600; }
+  .panel-badge {
+    font-size: 12px; padding: 3px 10px; border-radius: 20px;
+    font-weight: 500;
+  }
+  .badge-normal { background: var(--primary-light); color: var(--primary); }
+  .badge-warn { background: var(--warning-bg); color: var(--warning); }
+
+  .kpi-bar-wrap { margin-top: 8px; }
+  .kpi-bar-label {
+    display: flex; justify-content: space-between; margin-bottom: 6px;
+    font-size: 13px; color: var(--text-secondary);
+  }
+  .kpi-bar-label strong { color: var(--text); }
+  .kpi-bar {
+    height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden;
+  }
+  .kpi-bar-fill {
+    height: 100%; border-radius: 5px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    transition: width 0.6s ease;
+  }
+  .kpi-bar-fill.over { background: linear-gradient(90deg, var(--danger), #e88a99); }
+
+  /* Chart container */
+  .chart-wrap { position: relative; height: 220px; }
+  .chart-wrap canvas { width: 100% !important; }
+
+  /* Table Section */
+  .table-panel {
+    background: var(--card-bg); border-radius: var(--radius);
+    padding: 20px 24px; box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
+  }
+  .table-toolbar {
+    display: flex; gap: 10px; margin-bottom: 16px;
+    flex-wrap: wrap; align-items: center;
+  }
+  .filter-group {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .filter-group label {
+    font-size: 12px; color: var(--text-secondary); white-space: nowrap;
+  }
+  .filter-group select, .filter-group input {
+    padding: 6px 10px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 13px; background: #fff;
+    color: var(--text); outline: none; min-width: 130px;
+  }
+  .filter-group select:focus, .filter-group input:focus {
+    border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-light);
+  }
+  .btn {
+    padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 500;
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn:hover { background: var(--bg); }
+  .btn-primary {
+    background: var(--primary); color: #fff; border-color: var(--primary);
+  }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  .table-wrap { overflow-x: auto; }
+  table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+  }
+  thead { border-bottom: 2px solid var(--border); }
+  th {
+    text-align: left; padding: 10px 8px; font-weight: 600;
+    color: var(--text-secondary); font-size: 12px;
+    white-space: nowrap; cursor: pointer; user-select: none;
+  }
+  th .sort-icon { margin-left: 4px; font-size: 10px; opacity: 0.4; }
+  th.sorted .sort-icon { opacity: 1; color: var(--primary); }
+  td { padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:hover td { background: var(--bg); }
+
+  .anomaly-row td { background: var(--danger-bg) !important; }
+  .anomaly-dot {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--danger);
+    margin-right: 6px; vertical-align: middle;
+  }
+  .anomaly-tag {
+    display: inline-block; padding: 2px 8px; border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+    background: var(--danger-bg); color: var(--danger);
+  }
+  .change-up { color: var(--danger); font-weight: 500; }
+  .change-down { color: var(--success); font-weight: 500; }
+
+  .pagination {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 16px; font-size: 13px; color: var(--text-secondary);
+  }
+  .pagination-btns { display: flex; gap: 6px; }
+  .page-btn {
+    width: 32px; height: 32px; display: flex; align-items: center;
+    justify-content: center; border-radius: 6px; border: 1px solid var(--border);
+    background: #fff; cursor: pointer; font-size: 13px; color: var(--text);
+  }
+  .page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .page-btn:disabled { opacity: 0.4; cursor: default; }
+
+  .empty-state {
+    text-align: center; padding: 48px 0; color: var(--text-secondary);
+  }
+  th.n, td.n { text-align: right; }
+  #top10Table table { border-collapse: collapse; }
+  #top10Table th { padding: 6px 8px; font-size: 11px; border-bottom: 2px solid var(--border); }
+  #top10Table td { padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  #top10Table tr:hover td { background: var(--bg); }
+  #top10Table tr:first-child td { font-weight: 500; }
+
+
+  /* Data Bar */
+  .data-bar {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 20px;
+    margin-bottom: 20px; display: flex; align-items: center; gap: 16px;
+    box-shadow: var(--shadow-sm); flex-wrap: wrap;
+  }
+  .data-bar .status-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px;
+  }
+  .data-bar .status-dot.mock { background: var(--warning); }
+  .data-bar .status-dot.real { background: var(--success); }
+  .data-bar .status-text { font-size: 13px; color: var(--text-secondary); }
+  .data-bar .btn { white-space: nowrap; }
+  .data-bar .file-info { font-size: 12px; color: var(--text-secondary); }
+  .data-bar input[type=file] { display: none; }
+
+  @media (max-width: 1200px) {
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    .section-row { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .main { padding: 16px; }
+    .summary-grid { grid-template-columns: 1fr 1fr; }
+    .table-toolbar { flex-direction: column; }
+    .filter-group select, .filter-group input { min-width: 100%; }
+  }
+
+
+  /* Bimonthly breakdown table */
+  .bim-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .bim-table th { text-align: left; padding: 6px 8px; font-weight: 600; color: var(--text-secondary); font-size: 11px; border-bottom: 2px solid var(--border); }
+  .bim-table th.n { text-align: right; }
+  .bim-table td { padding: 7px 8px; border-bottom: 1px solid var(--border); }
+  .bim-table td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .bim-table tr:hover td { background: var(--bg); }
+  .bim-change-up { color: var(--danger); font-size: 11px; }
+  .bim-change-down { color: var(--success); font-size: 11px; }
+  /* Bimonthly Breakdown Bars */
+  .bim-bar-wrap { margin-bottom: 10px; }
+  .bim-bar-wrap:last-child { margin-bottom: 0; }
+  .bim-bar-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 4px; font-size: 13px;
+  }
+  .bim-bar-header .name { color: var(--text); font-weight: 500; }
+  .bim-bar-header .val { color: var(--text); font-weight: 600; font-size: 13px; }
+  .bim-bar-header .pct { color: var(--text-secondary); font-size: 11px; margin-left: 4px; }
+  .bim-bar {
+    height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden;
+  }
+  .bim-bar-fill {
+    height: 100%; border-radius: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    transition: width 0.6s ease;
+  }
+  /* Trend time filter */
+  .trend-filter { display:flex; align-items:center; gap:8px; font-size:12px; }
+  .trend-filter select { padding:4px 8px; border:1px solid var(--border); border-radius:6px; font-size:12px; background:#fff; color:var(--text); outline:none; }
+  .trend-filter select:focus { border-color:var(--primary); }
+  /* TOP50 */
+  .top50-wrap { max-height:520px; overflow-y:auto; }
+  .top50-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .top50-table th { text-align:left; padding:6px 8px; font-weight:600; color:var(--text-secondary); font-size:11px; border-bottom:2px solid var(--border); position:sticky; top:0; background:#fff; z-index:1; }
+  .top50-table td { padding:6px 8px; border-bottom:1px solid var(--border); }
+  .top50-table tr:hover td { background:var(--bg); cursor:pointer; }
+  .top50-table tr.expanded td { background:var(--primary-light); }
+  .top50-table .sub-row td { background:#faf9fc; font-size:11px; padding:4px 8px 4px 32px; color:var(--text-secondary); }
+  .top50-toolbar { display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; align-items:center; }
+  /* Self-delivery table */
+  .sd-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .sd-table th { text-align:left; padding:6px 8px; font-weight:600; color:var(--text-secondary); font-size:11px; border-bottom:2px solid var(--border); }
+  .sd-table td { padding:7px 8px; border-bottom:1px solid var(--border); }
+  .sd-table td.n { text-align:right; }
+  .sd-table tr:hover td { background:var(--bg); }
+  .sd-kpi-input { width:80px; padding:2px 6px; border:1px solid var(--border); border-radius:4px; font-size:11px; text-align:right; outline:none; }
+  .sd-kpi-input:focus { border-color:var(--primary); }
+  .sd-bar { height:6px; background:var(--bg); border-radius:3px; overflow:hidden; margin-top:2px; min-width:50px; }
+  .sd-bar-fill { height:100%; border-radius:3px; background:var(--primary); }
+  .sd-bar-fill.over { background:var(--danger); }
+  /* Week highlight */
+  .week-down { background:#fff5f5 !important; }
+  .week-down-badge { display:inline-block; padding:1px 6px; border-radius:10px; font-size:10px; font-weight:600; background:var(--danger-bg); color:var(--danger); margin-left:4px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="dot"></div>
+      <span>数据看板</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" data-section="section-overview" onclick="scrollToSection('section-overview',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        总览
+      </div>
+      <div class="nav-item" data-section="section-accounts" onclick="scrollToSection('section-accounts',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        子账户管理
+      </div>
+      <div class="nav-item" data-section="section-kpi" onclick="scrollToSection('section-kpi',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 118 2.83M22 12A10 10 0 0012 2v10l10-10z"/></svg>
+        KPI追踪
+      </div>
+      <div class="nav-item" data-section="section-accounts" onclick="scrollToSection('section-accounts',this); setTimeout(()=>{ const b=document.getElementById('btnExport'); if(b)b.click(); },400)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        报表导出
+      </div>
+    </nav>
+    <div style="padding:12px;margin-top:auto;font-size:11px;color:var(--text-secondary);text-align:center;">
+      下次更新 10:00
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main" id="app">
+    <!-- Top Bar -->
+    <div class="topbar">
+      <h1>消耗数据看板</h1>
+      <div class="topbar-right">
+        <span id="currentTime"></span>
+        <div class="refresh-badge" id="refreshBadge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+          今日已更新
+        </div>
+      </div>
+    </div>
+
+    
+    <!-- Data Management Bar -->
+    <div class="data-bar" id="dataBar">
+      <span class="status-dot mock" id="dataStatusDot"></span>
+      <span class="status-text" id="dataStatusText">已加载 Excel 账户数据</span>
+      <label class="btn btn-sm" style="cursor:pointer;margin-left:auto;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        上传 CSV 数据
+        <input type="file" id="csvUpload" accept=".csv" onchange="handleFileUpload(event)">
+      </label>
+      <div class="filter-group"><label>查看月份</label><select id="viewMonthSel" onchange="changeViewMonth(this.value)"><option value="">本月</option></select></div><button class="btn btn-sm" id="btnDownloadTemplate">下载模板</button>
+      <button class="btn btn-sm" id="btnResetData" style="color:var(--danger);border-color:var(--danger);">重置为模拟数据</button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div id="section-overview"></div>
+    <div class="summary-grid" id="summaryGrid"></div>
+    <!-- KPI Progress (bimonthly) -->
+    <div class="panel" id="kpiPanel" style="margin-bottom:16px;">
+      <div class="panel-header">
+        <span class="panel-title">本双月 KPI 完成进度</span>
+        <label style="font-size:12px;color:var(--text-secondary);white-space:nowrap;margin-left:12px;">双月KPI目标 ¥</label><input type="number" id="bimKpiInput" placeholder="输入目标" style="width:110px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text);outline:none;" onchange="setBimKpiTarget(this.value)"><span class="panel-badge badge-normal" id="kpiBadge">进行中</span>
+      </div>
+      <div id="kpiProgress"></div>
+    </div>
+
+    <!-- Chart + KPI Row -->
+    
+    <!-- 2-Month Consumption Breakdown -->
+    <div class="section-row" id="bimRow">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">按月消耗 · 按投放类型</span>
+        </div>
+        <div id="bimDeliveryType"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">按月消耗 · 按行业分类</span>
+        </div>
+        <div id="bimIndustry"></div>
+      </div>
+    </div>
+
+    <!-- Self-delivery -->
+    <div class="section-row" id="sdRow">
+      <div class="panel" style="grid-column:1/-1;">
+        <div class="panel-header">
+          <span class="panel-title">自有代投情况</span>
+        </div>
+        <div class="table-wrap" id="sdTable"></div>
+      </div>
+    </div>
+
+    <!-- Chart + KPI Row -->
+    <div id="section-kpi"></div>
+    <!-- Full-width Trend Chart -->
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-header">
+        <span class="panel-title">消耗趋势</span>
+        <div class="trend-filter"><select id="trendRange" onchange="renderTrendChart()"><option value="30">近30天</option><option value="1">1月</option><option value="2">2月</option><option value="3">3月</option><option value="4">4月</option><option value="5">5月</option><option value="60">近60天</option><option value="180">近180天</option></select></div>
+        <span style="font-size:11px;color:var(--text-secondary);">点击图例可切换数据线</span>
+      </div>
+      <div class="chart-wrap" style="height:300px;"><canvas id="trendChart"></canvas></div>
+    </div>
+    <!-- TOP10 Row -->
+    <div class="section-row">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">昨日消耗 TOP10</span>
+        </div>
+        <div id="top10Table"></div>
+      </div>
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-header">
+          <span class="panel-title">月度消耗 TOP50</span>
+        </div>
+        <div class="top50-toolbar" id="top50Toolbar"></div>
+        <div class="top50-wrap" id="top50Content"></div>
+      </div>
+    </div>
+
+<!-- Sub-account Table -->
+    <div id="section-accounts"></div>
+    <div class="table-panel">
+      <div class="panel-header">
+        <span class="panel-title">子账户消耗明细</span>
+        <span class="panel-badge badge-warn" id="anomalyCount"></span>
+      </div>
+      <!-- Filters -->
+      <div class="table-toolbar" id="filterBar"></div>
+      <!-- Table -->
+      <div class="table-wrap">
+        <table>
+          <thead id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div id="emptyState" class="empty-state" style="display:none;">暂无匹配数据</div>
+      <!-- Pagination -->
+      <div class="pagination" id="pagination"></div>
+    </div>
+
+    <!-- Bimonthly Rebate Reconciliation -->
+    <div class="table-panel" style="margin-top:24px;">
+      <div class="panel-header">
+        <span class="panel-title">双月返点核对</span>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="filter-group"><label>双月周期</label><select id="rbPeriod"><option value="">请选择</option></select></div>
+          <button class="btn btn-sm btn-primary" id="btnExportRebate">导出 CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>主体</th>
+              <th>客户名</th>
+              <th>子账户名称</th>
+              <th>上双月消耗</th>
+              <th>消耗所属档位</th>
+              <th class="n">当时充值返点</th>
+              <th class="n">按档位应给返点</th>
+              <th class="n">应后补金额</th>
+            </tr>
+          </thead>
+          <tbody id="rebateBody"></tbody>
+        </table>
+      </div>
+      <div id="rebateEmpty" class="empty-state" style="display:none;">请先选择双月周期</div>
+      <div id="rebateSummary" style="margin-top:16px;padding:12px 16px;background:var(--bg);border-radius:6px;font-size:13px;display:flex;gap:32px;color:var(--text-secondary);"></div>
+      <div class="pagination" id="rebatePagination" style="margin-top:12px;"></div>
+    </div>
+  </main>
+</div>
+
+<script src="accounts_data.js"></script>
+<script>
+// ==================== MOCK DATA ====================
+const GROUPS = ["华东一组","华东二组","华南组","华北组","西南组","电商专项组"];
+const INDUSTRIES = ["美妆个护","服饰鞋包","食品饮料","3C数码","母婴亲子","家居家装","医疗健康","教育","本地生活","汽车"];
+const DELIVERY_TYPES = ["自有代投","自有自投","二代账户"];
+const OPERATION_MODES = ["走量（自投+二代）", "运营（代投）"];
+const ACCOUNT_TYPES = ["电商","线索"];
+const DELIVERY_GROUPS = ["投放1组","投放2组","投放3组"];
+const PROFILE_PRIMARY_INDUSTRIES = ["美妆","服饰","食品饮料","3C","母婴","家居","医疗","教育","本地生活","汽车"];
+const PROFILE_SECONDARY_INDUSTRIES = ["护肤","彩妆","女装","男装","零食","饮品","手机","电脑","玩具","家纺","装修","药品","器械","K12","成人","餐饮","旅游","新能源","后市场"];
+function mapOperationMode(deliveryType) { return deliveryType === "自有代投" ? "运营（代投）" : "走量（自投+二代）"; }
+const BIMONTHLY_PERIODS = ["1&2双月","3&4双月","5&6双月","7&8双月","9&10双月","11&12双月"];
+const REBATE_TIERS = [
+  { max: 60000, label: "6万以下", rate: 0 },
+  { max: 180000, label: "6万-18万", rate: 0.02 },
+  { max: 600000, label: "18万-60万", rate: 0.04 },
+  { max: Infinity, label: "60万以上", rate: 0.06 },
+];
+function getTier(spend) {
+  for (const t of REBATE_TIERS) { if (spend < t.max) return t; }
+  return REBATE_TIERS[REBATE_TIERS.length - 1];
+}
+
+const ENTITIES = [
+  "上海美尚品牌管理有限公司","杭州潮流服饰有限公司","广州食悦食品有限公司",
+  "北京智联科技有限公司","深圳宝乐母婴用品有限公司","成都安居家居有限公司",
+  "上海康健医疗有限公司","北京优学教育科技有限公司","杭州本地生活服务有限公司",
+  "广州车联汽车销售有限公司","上海悦己美妆有限公司","深圳潮玩数码有限公司",
+  "南京绿色食品有限公司","武汉博爱母婴有限公司","西安古韵家居有限公司",
+  "厦门海悦健康管理有限公司","重庆山城教育咨询有限公司","天津滨海生活服务有限公司",
+  "苏州锦绣服装有限公司","郑州中原汽车服务有限公司"
+];
+
+function random(items) { return items[Math.floor(Math.random() * items.length)]; }
+function rand(min, max) { return Math.round((min + Math.random() * (max - min)) * 100) / 100; }
+
+let baseSeed = 42;
+function seededRand() {
+  baseSeed = (baseSeed * 16807) % 2147483647;
+  return (baseSeed - 1) / 2147483646;
+}
+
+const CUSTOMERS = [];
+for (let i = 0; i < 60; i++) {
+  const entity = random(ENTITIES);
+  const name = entity.replace("有限公司","").replace("科技","").replace("服务","").replace("咨询","").replace("销售","").replace("管理","").replace("用品","").slice(0,8) + "客户" + (i+1);
+  CUSTOMERS.push({ name, entity });
+}
+
+
+let rawRecords = [];
+let viewMonth = null;
+let subAccounts = [];
+let rebateData = [];
+
+function generateSubAccounts() {
+  rawRecords = [];
+  var accounts = window.__ACCOUNTS_DATA__;
+  if (!accounts || accounts.length === 0) {
+    for (var i = 0; i < 120; i++) {
+      var cust2 = CUSTOMERS[i % CUSTOMERS.length];
+      var baseDaily2 = rand(800, 12000);
+      var saName2 = cust2.name + "子账户" + (i+1);
+      var grp2 = random(GROUPS);
+      var ind2 = random(INDUSTRIES);
+      var dt2 = random(DELIVERY_TYPES);
+      var at2 = random(ACCOUNT_TYPES);
+      var dg2 = random(DELIVERY_GROUPS);
+      var ppi2 = random(PROFILE_PRIMARY_INDUSTRIES);
+      var psi2 = random(PROFILE_SECONDARY_INDUSTRIES);
+      for (var d2 = 0; d2 < 60; d2++) {
+        var date2 = new Date();
+        date2.setDate(date2.getDate() - d2);
+        var ds2 = date2.toISOString().slice(0,10);
+        var spend2 = Math.round(baseDaily2 * (0.5 + seededRand() * 1.0) * 100) / 100;
+        rawRecords.push({
+          subAccountName: saName2, customerName: cust2.name, profileName: cust2.name + "专业号",
+          entity: cust2.entity, group: grp2, industry: ind2,
+          deliveryType: dt2, accountType: at2, deliveryGroup: dg2,
+          profilePrimaryIndustry: ppi2, profileSecondaryIndustry: psi2,
+          operationMode: mapOperationMode(dt2), date: ds2, spend: spend2
+        });
+      }
+    }
+    rebuildSubAccounts();
+    return;
+  }
+  var now = new Date();
+  for (var i = 0; i < accounts.length; i++) {
+    var acc = accounts[i];
+    var baseDaily = rand(800, 12000);
+    for (var d = 0; d < 60; d++) {
+      var date = new Date(now);
+      date.setDate(date.getDate() - d);
+      var ds = date.toISOString().slice(0,10);
+      var spend = Math.round(baseDaily * (0.5 + seededRand() * 1.0) * 100) / 100;
+      rawRecords.push({
+        subAccountName: acc.subAccountName || ("子账户" + i),
+        customerName: acc.customerName || "",
+        profileName: "",
+        entity: acc.entity || "",
+        group: acc.source || "",
+        industry: acc.industry || "",
+        deliveryType: acc.deliveryType || "自有代投",
+        accountType: (acc.accountType === "线索" || acc.accountType === "电商") ? acc.accountType : "电商",
+        deliveryGroup: acc.deliveryGroup || "",
+        profilePrimaryIndustry: acc.primaryInd || "",
+        profileSecondaryIndustry: acc.secondaryInd || "",
+        operationMode: mapOperationMode(acc.deliveryType || "自有代投"),
+        date: ds, spend: spend
+      });
+    }
+  }
+  rebuildSubAccounts();
+}
+
+// Generate bimonthly rebate data - each account has 6 bimonthly periods
+
+function rebuildSubAccounts() {
+  var now = new Date();
+  var vMonth = viewMonth || (now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0'));
+  var parts = vMonth.split('-').map(Number);
+  var vy = parts[0], vm = parts[1];
+  var py = vy, pm = vm - 1;
+  if (pm === 0) { pm = 12; py--; }
+  var todayStr = viewMonth ? null : now.toISOString().slice(0,10);
+  var yesterdayDate = new Date(now); yesterdayDate.setDate(yesterdayDate.getDate()-1);
+  var yesterdayStr = viewMonth ? null : yesterdayDate.toISOString().slice(0,10);
+  var map = {};
+  for (var i = 0; i < rawRecords.length; i++) {
+    var r = rawRecords[i];
+    var key = r.subAccountName;
+    if (!map[key]) {
+      map[key] = {
+        subAccountName: key,
+        customerName: r.customerName,
+        profileName: r.profileName,
+        entity: r.entity,
+        group: r.group,
+        industry: r.industry,
+        deliveryType: r.deliveryType,
+        accountType: r.accountType,
+        deliveryGroup: r.deliveryGroup,
+        profilePrimaryIndustry: r.profilePrimaryIndustry || "",
+        profileSecondaryIndustry: r.profileSecondaryIndustry || "",
+        operationMode: r.operationMode || mapOperationMode(r.deliveryType || "自有代投"),
+        today: 0, yesterday: 0, monthTotal: 0, lastMonthTotal: 0, thisWeekTotal: 0, lastWeekTotal: 0
+      };
+    }
+    var d = r.date;
+    var dparts = d.split('-').map(Number);
+    var dy = dparts[0], dm = dparts[1], dd = dparts[2];
+    if (dy === vy && dm === vm) {
+      map[key].monthTotal += r.spend;
+      if (todayStr && d === todayStr) map[key].today = r.spend;
+      if (yesterdayStr && d === yesterdayStr) map[key].yesterday = r.spend;
+      var rd2 = new Date(dy, dm-1, dd);
+      var dayDiff2 = Math.floor((now - rd2) / 86400000);
+      if (dayDiff2 >= 0 && dayDiff2 < 7) map[key].thisWeekTotal += r.spend;
+      if (dayDiff2 >= 7 && dayDiff2 < 14) map[key].lastWeekTotal += r.spend;
+    }
+    if (dy === py && dm === pm) {
+      map[key].lastMonthTotal += r.spend;
+    }
+  }
+  subAccounts = Object.values(map).map(function(a, i) {
+    a.id = i + 1;
+    a.yesterdayCompare = a.yesterday > 0 ? ((a.today - a.yesterday) / a.yesterday * 100) : 0;
+    a.monthCompare = a.lastMonthTotal > 0 ? ((a.monthTotal - a.lastMonthTotal) / a.lastMonthTotal * 100) : 0;
+    a.weekCompare = a.lastWeekTotal > 0 ? ((a.thisWeekTotal - a.lastWeekTotal) / a.lastWeekTotal * 100) : 0;
+    a.isWeekDown = a.weekCompare < -5;
+    a.isAnomaly = Math.abs(a.yesterdayCompare) > 30 || Math.abs(a.monthCompare) > 30;
+    return a;
+  });
+  rebateData = generateRebateData(subAccounts);
+}
+
+function changeViewMonth(val) {
+  viewMonth = val || null;
+  rebuildSubAccounts();
+  state.page = 1;
+  renderAll();
+}
+
+function populateMonthSelector() {
+  var sel = document.getElementById('viewMonthSel');
+  if (!sel || sel.options.length > 1) return;
+  var months = [];
+  var now = new Date();
+  for (var i = 5; i >= 0; i--) {
+    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
+  }
+  sel.innerHTML = '<option value="">本月</option>' +
+    months.map(function(m) { return '<option value="' + m + '"' + (viewMonth === m ? ' selected' : '') + '>' + m + '</option>'; }).join('');
+}
+function generateRebateData(accounts) {
+  const data = [];
+  for (var i = 0; i < accounts.length; i++) {
+    var acc = accounts[i];
+    for (var p = 0; p < BIMONTHLY_PERIODS.length; p++) {
+      var spend = Math.round(rand(1000, 800000) * 100) / 100;
+      var tier = getTier(spend);
+      var shouldRate = tier.rate;
+      var variance = (seededRand() - 0.4) * 0.04;
+      var actualRate = shouldRate + variance;
+      if (actualRate < 0) actualRate = 0;
+      if (actualRate > 0.08) actualRate = 0.08;
+      actualRate = Math.round(actualRate * 10000) / 10000;
+      var diff = 0;
+      if (shouldRate > actualRate) {
+        diff = spend / (1 + actualRate) * (shouldRate - actualRate) / (1 + shouldRate);
+        diff = Math.round(diff * 100) / 100;
+      }
+      data.push({
+        subAccountName: acc.subAccountName,
+        customerName: acc.customerName || "",
+        entity: acc.entity || "",
+        period: BIMONTHLY_PERIODS[p],
+        spend: spend,
+        tierLabel: tier.label,
+        tierRate: tier.rate,
+        actualRate: actualRate,
+        shouldRate: shouldRate,
+        diff: diff,
+        needsSupplement: diff > 0.01
+      });
+    }
+  }
+  return data;
+}
+
+// rebateData is generated in rebuildSubAccounts()
+
+
+// ==================== STATE ====================
+const state = {
+  sortKey: null,
+  sortDir: "asc",
+  filters: { customerName: "", profileName: "", entity: "", group: "", industry: "", subAccountName: "", deliveryType: "", profilePrimaryIndustry: "", profileSecondaryIndustry: "", operationMode: "" }, rbPeriod: "",
+  rebatePage: 1, rebatePageSize: 30,
+  trendRange: "30", top50Month: "", top50Industry: "", expandedCustomer: null,
+  page: 1,
+  pageSize: 15,
+};
+
+// ==================== DERIVED DATA ====================
+function getSummary() {
+  let today = 0, yesterday = 0, month = 0, lastMonth = 0;
+  subAccounts.forEach(a => {
+    today += a.today;
+    yesterday += a.yesterday;
+    month += a.monthTotal;
+    lastMonth += a.lastMonthTotal;
+      });
+  return { today, yesterday, month, lastMonth };
+}
+
+
+function getBimPeriod(monthStr) {
+  var now = new Date();
+  var m = monthStr ? parseInt(monthStr.split("-")[1]) : (now.getMonth() + 1);
+  var y = monthStr ? parseInt(monthStr.split("-")[0]) : now.getFullYear();
+  if (m % 2 === 1) return y + "-" + m + "&" + (m+1) + "双月";
+  return y + "-" + (m-1) + "&" + m + "双月";
+}
+
+function loadKpiTargets() {
+  if (window._kpiTargets === undefined) {
+    var saved = localStorage.getItem("bimonthly_kpi_targets");
+    window._kpiTargets = saved ? JSON.parse(saved) : {};
+  }
+  return window._kpiTargets;
+}
+
+function getBimKpiTarget() {
+  var targets = loadKpiTargets();
+  var period = getBimPeriod(viewMonth);
+  return targets[period] || 0;
+}
+
+function setBimKpiTarget(val) {
+  var targets = loadKpiTargets();
+  var period = getBimPeriod(viewMonth);
+  targets[period] = parseFloat(val) || 0;
+  window._kpiTargets = targets;
+  localStorage.setItem("bimonthly_kpi_targets", JSON.stringify(targets));
+  renderKPI();
+}
+
+function getHistoricalKpi() {
+  var targets = loadKpiTargets();
+  var now = new Date();
+  var currentPeriod = getBimPeriod(null);
+  var result = [];
+  var cm = now.getMonth() + 1;
+  var cy = now.getFullYear();
+  for (var i = 0; i < 4; i++) {
+    var pm = cm - i * 2;
+    var py = cy;
+    while (pm <= 0) { pm += 12; py--; }
+    var pLabel;
+    if (pm % 2 === 1) pLabel = py + "-" + pm + "&" + (pm+1) + "双月";
+    else pLabel = py + "-" + (pm-1) + "&" + pm + "双月";
+    if (pLabel === currentPeriod) continue;
+    var target = targets[pLabel] || 0;
+    var actual = 0;
+    var pStartMonth = (pm % 2 === 1) ? pm : pm - 1;
+    rawRecords.forEach(function(r) {
+      var dp = r.date.split("-");
+      var dy = parseInt(dp[0]), dm = parseInt(dp[1]);
+      if (dy === py && (dm === pStartMonth || dm === pStartMonth + 1)) {
+        actual += r.spend;
+      }
+    });
+    var pct = target > 0 ? (actual / target * 100).toFixed(1) : 0;
+    result.push({ period: pLabel, target: target, actual: actual, pct: pct });
+  }
+  return result;
+}
+function getFilteredAccounts() {
+  let list = [...subAccounts];
+  const f = state.filters;
+  if (f.customerName) list = list.filter(a => a.customerName.includes(f.customerName));
+  if (f.profileName) list = list.filter(a => a.profileName.includes(f.profileName));
+  if (f.entity) list = list.filter(a => a.entity.includes(f.entity));
+  if (f.group) list = list.filter(a => a.group === f.group);
+  if (f.industry) list = list.filter(a => a.industry === f.industry);
+  if (f.subAccountName) list = list.filter(a => a.subAccountName.includes(f.subAccountName));
+  if (f.deliveryType) list = list.filter(a => a.deliveryType === f.deliveryType);
+  if (f.operationMode) list = list.filter(a => a.operationMode === f.operationMode);
+  if (f.accountType) list = list.filter(a => a.accountType === f.accountType);
+  if (f.deliveryGroup) list = list.filter(a => a.deliveryGroup === f.deliveryGroup);
+  if (f.profilePrimaryIndustry) list = list.filter(a => a.profilePrimaryIndustry === f.profilePrimaryIndustry);
+  if (f.profileSecondaryIndustry) list = list.filter(a => a.profileSecondaryIndustry === f.profileSecondaryIndustry);
+
+  if (state.sortKey) {
+    list.sort((a,b) => {
+      const va = a[state.sortKey], vb = b[state.sortKey];
+      if (typeof va === "string") return state.sortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+      return state.sortDir === "asc" ? va - vb : vb - va;
+    });
+  }
+  return list;
+}
+
+// ==================== RENDER ====================
+function fmt(n) {
+  if (n >= 10000) return (n/10000).toFixed(1) + "万";
+  return n.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function renderSummary() {
+  const s = getSummary();
+  const tdyChange = s.yesterday > 0 ? ((s.today - s.yesterday) / s.yesterday * 100) : 0;
+  const momChange = s.lastMonth > 0 ? ((s.month - s.lastMonth) / s.lastMonth * 100) : 0;
+  const cards = [
+    { label: "今日消耗", value: s.today, subVal: tdyChange, subLabel: "较昨日" },
+    { label: "昨日消耗", value: s.yesterday, subVal: null, subLabel: "" },
+    { label: "本月累计消耗", value: s.month, subVal: momChange, subLabel: "较上月" },
+    { label: "上月累计消耗", value: s.lastMonth, subVal: null, subLabel: "" },
+  ];
+  document.getElementById("summaryGrid").innerHTML = cards.map(c => {
+    const subHtml = c.subVal !== null
+      ? `<div class="sub ${c.subVal >= 0 ? 'up' : 'down'}"><span class="arrow">${c.subVal >= 0 ? '↑' : '↓'}</span> ${c.subLabel} ${Math.abs(c.subVal).toFixed(1)}%</div>`
+      : `<div class="sub" style="color:var(--text-secondary)">-</div>`;
+    return `<div class="summary-card"><div class="label">${c.label}</div><div class="value">¥${fmt(c.value)}<span class="unit"></span></div>${subHtml}</div>`;
+  }).join("");
+}
+
+function renderKPI() {
+  const s = getSummary();
+  const bimonth = s.month + s.lastMonth;
+  const bimKpi = getBimKpiTarget();
+  const pct = bimKpi > 0 ? (bimonth / bimKpi * 100) : 0;
+  const badge = document.getElementById("kpiBadge");
+  badge.textContent = pct >= 100 ? "已达成" : pct >= 80 ? "接近目标" : "进行中";
+  badge.className = "panel-badge " + (pct >= 100 ? "badge-warn" : "badge-normal");
+
+  const now = new Date();
+  // Bimonthly period: odd months (1,3,5,7,9,11) start a new period
+  var periodStartMonth = now.getMonth() % 2 === 0 ? now.getMonth() : now.getMonth() - 1;
+  var periodStart = new Date(now.getFullYear(), periodStartMonth, 1);
+  var periodEnd = new Date(now.getFullYear(), periodStartMonth + 2, 0);
+  var totalDays = (periodEnd - periodStart) / 86400000 + 1;
+  var elapsed = (now - periodStart) / 86400000;
+  var timePct = Math.min(100, (elapsed / totalDays * 100));
+  var inp = document.getElementById("bimKpiInput"); if (inp && inp !== document.activeElement) { inp.value = bimKpi || ""; }
+
+
+  document.getElementById("kpiProgress").innerHTML = `
+    <div class="kpi-bar-wrap" style="margin-bottom:16px;">
+      <div class="kpi-bar-label"><span>本双月 KPI 完成率</span><strong>${pct.toFixed(1)}%</strong></div>
+      <div class="kpi-bar"><div class="kpi-bar-fill ${pct >= 100 ? 'over' : ''}" style="width:${Math.min(pct,100)}%"></div></div>
+    </div>
+    <div class="kpi-bar-wrap">
+      <div class="kpi-bar-label"><span>时间进度</span><strong>${timePct.toFixed(0)}%</strong></div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:${timePct}%;opacity:0.5"></div></div>
+    </div>
+    <div style="margin-top:12px;display:flex;justify-content:space-between;font-size:13px;color:var(--text-secondary);">
+      <span>双月目标：<strong style="color:var(--text)">¥${fmt(bimKpi)}</strong></span>
+      <span>已完成：<strong style="color:var(--text)">¥${fmt(bimonth)}</strong></span>
+      <span>剩余：<strong style="color:${bimKpi > bimonth ? 'var(--primary)' : 'var(--text)'}">¥${fmt(Math.max(0, bimKpi - bimonth))}</strong></span>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:${pct < timePct ? 'var(--danger)' : 'var(--success)'}">
+      ${pct < timePct ? '⚠ 消耗进度落后于时间进度' : '✓ 消耗进度领先于时间进度'}
+    </div>
+    `;
+
+  document.getElementById("kpiProgress").innerHTML += renderHistoricalKpiHtml();
+}
+
+function renderHistoricalKpiHtml() {
+  var history = getHistoricalKpi();
+  if (history.length === 0) return "";
+  var html = '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">' +
+    '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">历史双月 KPI</div>';
+  history.forEach(function(h) {
+    var hpct = parseFloat(h.pct);
+    var color = hpct >= 100 ? "var(--success)" : hpct >= 80 ? "var(--warning)" : "var(--danger)";
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;">' +
+      '<span style="width:80px;color:var(--text-secondary);">' + h.period + '</span>' +
+      '<span style="flex:1;">' +
+        '<span style="display:inline-block;height:6px;border-radius:3px;background:' + color + ';width:' + Math.min(hpct, 100) + '%;vertical-align:middle;"></span>' +
+      '</span>' +
+      '<span style="width:70px;text-align:right;font-weight:600;color:' + color + ';">' + (h.target > 0 ? hpct + '%' : '-') + '</span>' +
+      '<span style="width:90px;text-align:right;color:var(--text-secondary);">¥' + fmt(h.actual) + '</span>' +
+    '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+// Custom plugin: draw value labels at end of each visible line
+const endLabelPlugin = {
+  id: "endLabel",
+  afterDraw(chart, args, opts) {
+    const { ctx } = chart;
+    const meta0 = chart.getDatasetMeta(0);
+    if (!meta0 || !meta0.data.length) return;
+    ctx.save();
+    ctx.font = (opts.font?.size || 10) + "px -apple-system, PingFang SC, sans-serif";
+    ctx.fillStyle = opts.color || "#6e6b7b";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    const offset = opts.offset || 6;
+    chart.data.datasets.forEach((ds, di) => {
+      const meta = chart.getDatasetMeta(di);
+      if (!meta.visible || !meta.data.length) return;
+      const last = meta.data[meta.data.length - 1];
+      const val = ds.data[ds.data.length - 1];
+      const label = "¥" + (val >= 10000 ? (val/10000).toFixed(1) + "万" : val.toFixed(0));
+      ctx.fillStyle = ds.borderColor;
+      ctx.fillText(label, last.x + offset, last.y);
+    });
+    ctx.restore();
+  }
+};
+Chart.register(endLabelPlugin);
+
+function renderTrendChart() {
+  var ctx = document.getElementById("trendChart").getContext("2d");
+  if (window._trendChart) window._trendChart.destroy();
+  var sel = document.getElementById("trendRange");
+  var range = sel ? sel.value : "30";
+  state.trendRange = range;
+  var now = new Date();
+  var days = []; var labels = [];
+  if (range === "1" || range === "2" || range === "3" || range === "4" || range === "5") {
+    var m = parseInt(range);
+    var y = now.getFullYear();
+    var lastDay = new Date(y, m, 0).getDate();
+    for (var d2 = 1; d2 <= lastDay; d2++) {
+      var dt = new Date(y, m-1, d2);
+      days.push(dt.toISOString().slice(0,10));
+      labels.push(m+"/"+d2);
+    }
+  } else {
+    var nDays = parseInt(range) || 30;
+    for (var i2 = nDays-1; i2 >= 0; i2--) {
+      var dt2 = new Date(now); dt2.setDate(dt2.getDate() - i2);
+      days.push(dt2.toISOString().slice(0,10));
+      labels.push((dt2.getMonth()+1)+"/"+dt2.getDate());
+    }
+  }
+  var totalData = [], zydtData = [], zyztData = [], edzhData = [];
+  days.forEach(function(ds){
+    totalData.push(0); zydtData.push(0); zyztData.push(0); edzhData.push(0);
+  });
+  rawRecords.forEach(function(r){
+    var idx3 = days.indexOf(r.date);
+    if (idx3 < 0) return;
+    totalData[idx3] += r.spend;
+    if (r.deliveryType === "自有代投") zydtData[idx3] += r.spend;
+    else if (r.deliveryType === "自有自投") zyztData[idx3] += r.spend;
+    else edzhData[idx3] += r.spend;
+  });
+  totalData = totalData.map(function(v){ return Math.round(v*100)/100; });
+  zydtData = zydtData.map(function(v){ return Math.round(v*100)/100; });
+  zyztData = zyztData.map(function(v){ return Math.round(v*100)/100; });
+  edzhData = edzhData.map(function(v){ return Math.round(v*100)/100; });
+  var datasets = [
+    { label: "总消耗", data: totalData, borderColor: "#5b5fcf", backgroundColor: "rgba(91,95,207,0.06)", fill: true, tension: 0.35, pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: "#5b5fcf", borderWidth: 2.5, borderDash: [] },
+    { label: "自有代投", data: zydtData, borderColor: "#7c6faa", backgroundColor: "rgba(124,111,170,0.05)", fill: true, tension: 0.35, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: "#7c6faa", borderWidth: 2, borderDash: [] },
+    { label: "自有自投", data: zyztData, borderColor: "#3da589", backgroundColor: "rgba(61,165,137,0.05)", fill: true, tension: 0.35, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: "#3da589", borderWidth: 2, borderDash: [5,3] },
+    { label: "二代账户", data: edzhData, borderColor: "#e08b5b", backgroundColor: "rgba(224,139,91,0.05)", fill: true, tension: 0.35, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: "#e08b5b", borderWidth: 2, borderDash: [3,5] },
+  ];
+  window._trendChart = new Chart(ctx, {
+    type: "line",
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { intersect: false, mode: "index" },
+      plugins: {
+        legend: {
+          display: true, position: "top", align: "end",
+          labels: { usePointStyle: true, pointStyleWidth: 8, boxHeight: 2, padding: 16, font: { size: 11 }, color: "#6e6b7b" },
+          onClick: function(e, legendItem, legend) {
+            var chart = legend.chart; var idx4 = legendItem.datasetIndex;
+            var anyVisible = false;
+            chart.data.datasets.forEach(function(ds, i) { if (i !== idx4 && !chart.getDatasetMeta(i).hidden) anyVisible = true; });
+            if (!anyVisible || chart.getDatasetMeta(idx4).hidden) {
+              chart.data.datasets.forEach(function(ds, i) { chart.getDatasetMeta(i).hidden = false; });
+            } else {
+              chart.data.datasets.forEach(function(ds, i) { chart.getDatasetMeta(i).hidden = (i !== idx4); });
+            }
+            chart.update();
+          }
+        },
+        endLabel: { font: { size: 10 }, color: "#6e6b7b", offset: 8 },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: "#6e6b7b", maxTicksLimit: 10 } },
+        y: { grid: { color: "#f0edf5" }, ticks: { font: { size: 11 }, color: "#6e6b7b", callback: function(v){ return "¥"+(v/1000).toFixed(0)+"k"; } } },
+      },
+    },
+  });
+}function renderFilters() {
+  const groups = [...new Set(subAccounts.map(a => a.group))].sort();
+  const industries = [...new Set(subAccounts.map(a => a.industry))].sort();
+  document.getElementById("filterBar").innerHTML = `
+    <div class="filter-group"><label>客户名</label><input type="text" id="fCustomer" placeholder="输入客户名" value="${state.filters.customerName}"></div>
+    <div class="filter-group"><label>专业号</label><input type="text" id="fProfile" placeholder="输入专业号" value="${state.filters.profileName}"></div>
+    <div class="filter-group"><label>主体</label><input type="text" id="fEntity" placeholder="输入主体名称" value="${state.filters.entity}"></div>
+    <div class="filter-group"><label>来源</label><select id="fGroup"><option value="">全部</option>${groups.map(g => `<option value="${g}" ${state.filters.group===g?'selected':''}>${g}</option>`).join("")}</select></div>
+    <div class="filter-group"><label>行业</label><select id="fIndustry"><option value="">全部</option>${industries.map(g => `<option value="${g}" ${state.filters.industry===g?'selected':''}>${g}</option>`).join("")}</select></div>
+        <div class="filter-group"><label>子账户名</label><input type="text" id="fSubAccount" placeholder="输入子账户名" value="${state.filters.subAccountName}"></div>
+    <div class="filter-group"><label>投放类型</label><select id="fDeliveryType"><option value="">全部</option>${DELIVERY_TYPES.map(g => `<option value="${g}" ${state.filters.deliveryType===g?"selected":""}>${g}</option>`).join("")}</select></div>
+<div class="filter-group"><label>是否自运营</label><select id="fOperationMode"><option value="">全部</option>${OPERATION_MODES.map(g => `<option value="${g}" ${state.filters.operationMode===g?"selected":""}>${g}</option>`).join("")}</select></div>
+<div class="filter-group"><label>账户类型</label><select id="fAccountType"><option value="">全部</option>${ACCOUNT_TYPES.map(g => `<option value="${g}" ${state.filters.accountType===g?"selected":""}>${g}</option>`).join("")}</select></div>
+<div class="filter-group"><label>投放组别</label><select id="fDeliveryGroup"><option value="">全部</option>${DELIVERY_GROUPS.map(g => `<option value="${g}" ${state.filters.deliveryGroup===g?"selected":""}>${g}</option>`).join("")}</select></div>
+<div class="filter-group"><label>专业号一级行业</label><select id="fProfilePrimaryIndustry"><option value="">全部</option>${PROFILE_PRIMARY_INDUSTRIES.map(g => `<option value="${g}" ${state.filters.profilePrimaryIndustry===g?"selected":""}>${g}</option>`).join("")}</select></div>
+<div class="filter-group"><label>专业号二级行业</label><select id="fProfileSecondaryIndustry"><option value="">全部</option>${PROFILE_SECONDARY_INDUSTRIES.map(g => `<option value="${g}" ${state.filters.profileSecondaryIndustry===g?"selected":""}>${g}</option>`).join("")}</select></div>
+    <button class="btn btn-sm" id="btnReset">重置</button>
+    <button class="btn btn-sm btn-primary" id="btnExport">导出 CSV</button>
+  `;
+  ["fCustomer","fProfile","fEntity","fSubAccount"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("input", debounce(applyFilters, 300));
+  });
+  ["fGroup","fIndustry","fDeliveryType","fOperationMode","fAccountType","fDeliveryGroup","fProfilePrimaryIndustry","fProfileSecondaryIndustry"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", applyFilters);
+  });
+  document.getElementById("btnReset")?.addEventListener("click", resetFilters);
+  document.getElementById("btnExport")?.addEventListener("click", exportCSV);
+}
+
+function renderTable() {
+  const filtered = getFilteredAccounts();
+  const anomalyCount = filtered.filter(a => a.isAnomaly).length;
+  document.getElementById("anomalyCount").textContent = anomalyCount > 0 ? `${anomalyCount} 个异常` : "无异常";
+
+  document.getElementById("tableHead").innerHTML = [
+    { key: "customerName", label: "客户名" },
+    { key: "profileName", label: "专业号" },
+    { key: "entity", label: "营业执照主体" },
+    { key: "group", label: "来源" },
+    { key: "industry", label: "行业分类" },
+    { key: "subAccountName", label: "子账户名称" },
+    { key: "profilePrimaryIndustry", label: "专业号一级行业" },
+    { key: "profileSecondaryIndustry", label: "专业号二级行业" },
+    { key: "deliveryType", label: "投放类型" },
+    { key: "operationMode", label: "是否自运营" },
+    { key: "accountType", label: "账户类型" },
+    { key: "deliveryGroup", label: "投放组别" },
+    { key: "today", label: "今日消耗" },
+    { key: "yesterdayCompare", label: "日环比" },
+    { key: "monthTotal", label: "本月消耗" },
+    { key: "monthCompare", label: "月环比" },
+    { key: "weekCompare", label: "周环比" },
+    
+  ].map(col => {
+    const sorted = state.sortKey === col.key;
+    const icon = sorted ? (state.sortDir === "asc" ? "▲" : "▼") : "⇅";
+    return `<th class="${sorted?'sorted':''}" data-key="${col.key}">${col.label}<span class="sort-icon">${icon}</span></th>`;
+  }).join("");
+
+  document.querySelectorAll("#tableHead th").forEach(th => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.key;
+      if (state.sortKey === key) {
+        state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+      } else {
+        state.sortKey = key;
+        state.sortDir = "asc";
+      }
+      state.page = 1;
+      renderTable();
+    });
+  });
+
+  const totalPages = Math.ceil(filtered.length / state.pageSize);
+  if (state.page > totalPages) state.page = Math.max(1, totalPages);
+  const start = (state.page - 1) * state.pageSize;
+  const pageItems = filtered.slice(start, start + state.pageSize);
+
+  if (pageItems.length === 0) {
+    document.getElementById("tableBody").innerHTML = "";
+    document.getElementById("emptyState").style.display = "block";
+    document.getElementById("pagination").innerHTML = "";
+  } else {
+    document.getElementById("emptyState").style.display = "none";
+    document.getElementById("tableBody").innerHTML = pageItems.map(a => {
+      const rowClass = a.isAnomaly ? "anomaly-row" : "";
+      const anomalyIndicator = a.isAnomaly ? '<span class="anomaly-dot"></span>' : "";
+      return `<tr class="${rowClass}">
+        <td>${anomalyIndicator}${a.customerName}${a.isAnomaly ? ' <span class="anomaly-tag">异常</span>' : ''}</td>
+        <td>${a.profileName}</td>
+        <td>${a.entity}</td>
+        <td>${a.group}</td>
+        <td>${a.industry}</td>
+        <td>${a.subAccountName}</td>
+        <td>${a.profilePrimaryIndustry || "-"}</td>
+        <td>${a.profileSecondaryIndustry || "-"}</td>
+        <td>${a.deliveryType}</td>
+        <td>${a.operationMode || mapOperationMode(a.deliveryType)}</td>
+        <td>${a.accountType}</td>
+        <td>${a.deliveryGroup}</td>
+        <td>¥${fmt(a.today)}</td>
+        <td class="${a.yesterdayCompare >= 0 ? 'change-up' : 'change-down'}">${a.yesterdayCompare >= 0 ? '+' : ''}${a.yesterdayCompare.toFixed(1)}%</td>
+        <td>¥${fmt(a.monthTotal)}</td>
+        <td class="${a.monthCompare >= 0 ? 'change-up' : 'change-down'}">${a.monthCompare >= 0 ? '+' : ''}${a.monthCompare.toFixed(1)}%</td>
+        
+      </tr>`;
+    }).join("");
+
+    document.getElementById("pagination").innerHTML = `
+      <span>共 ${filtered.length} 条，第 ${state.page}/${totalPages} 页</span>
+      <div class="pagination-btns">
+        <button class="page-btn" ${state.page <= 1 ? 'disabled' : ''} id="btnFirst">«</button>
+        <button class="page-btn" ${state.page <= 1 ? 'disabled' : ''} id="btnPrev">‹</button>
+        ${renderPageNumbers(totalPages)}
+        <button class="page-btn" ${state.page >= totalPages ? 'disabled' : ''} id="btnNext">›</button>
+        <button class="page-btn" ${state.page >= totalPages ? 'disabled' : ''} id="btnLast">»</button>
+      </div>
+    `;
+
+    document.getElementById("btnFirst")?.addEventListener("click", () => { state.page = 1; renderTable(); });
+    document.getElementById("btnPrev")?.addEventListener("click", () => { state.page = Math.max(1, state.page - 1); renderTable(); });
+    document.getElementById("btnNext")?.addEventListener("click", () => { state.page = Math.min(totalPages, state.page + 1); renderTable(); });
+    document.getElementById("btnLast")?.addEventListener("click", () => { state.page = totalPages; renderTable(); });
+    document.querySelectorAll(".page-num").forEach(btn => {
+      btn.addEventListener("click", () => { state.page = parseInt(btn.dataset.page); renderTable(); });
+    });
+  }
+}
+
+function renderPageNumbers(totalPages) {
+  let pages = [];
+  const p = state.page;
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (p > 3) pages.push("...");
+    for (let i = Math.max(2, p-1); i <= Math.min(totalPages-1, p+1); i++) pages.push(i);
+    if (p < totalPages - 2) pages.push("...");
+    pages.push(totalPages);
+  }
+  return pages.map(n => {
+    if (n === "...") return '<span style="padding:0 6px">…</span>';
+    return `<button class="page-btn page-num ${n === state.page ? 'active' : ''}" data-page="${n}">${n}</button>`;
+  }).join("");
+}
+
+function applyFilters() {
+  state.filters.customerName = document.getElementById("fCustomer")?.value || "";
+  state.filters.profileName = document.getElementById("fProfile")?.value || "";
+  state.filters.entity = document.getElementById("fEntity")?.value || "";
+  state.filters.group = document.getElementById("fGroup")?.value || "";
+  state.filters.industry = document.getElementById("fIndustry")?.value || "";
+  state.filters.subAccountName = document.getElementById("fSubAccount")?.value || "";
+  state.filters.deliveryType = document.getElementById("fDeliveryType")?.value || "";
+  state.filters.operationMode = document.getElementById("fOperationMode")?.value || "";
+  state.filters.profilePrimaryIndustry = document.getElementById("fProfilePrimaryIndustry")?.value || "";
+  state.filters.profileSecondaryIndustry = document.getElementById("fProfileSecondaryIndustry")?.value || "";
+  state.filters.accountType = document.getElementById("fAccountType")?.value || "";
+  state.filters.deliveryGroup = document.getElementById("fDeliveryGroup")?.value || "";
+  state.page = 1;
+  renderTable();
+}
+
+function resetFilters() {
+  state.filters = { customerName: "", profileName: "", entity: "", group: "", industry: "", subAccountName: "", deliveryType: "", operationMode: "", accountType: "", deliveryGroup: "", profilePrimaryIndustry: "", profileSecondaryIndustry: "" };
+  state.page = 1;
+  renderFilters();
+  renderTable();
+}
+
+function exportCSV() {
+  const filtered = getFilteredAccounts();
+  const headers = ["客户名","专业号","营业执照主体","来源","行业分类","子账户名称","专业号一级行业","专业号二级行业","投放类型","是否自运营","账户类型","投放组别","今日消耗","昨日消耗","日环比","本月消耗","上月消耗","月环比"];
+  const rows = filtered.map(a => [
+    a.customerName, a.profileName, a.entity, a.group, a.industry, a.subAccountName, a.profilePrimaryIndustry || "", a.profileSecondaryIndustry || "", a.deliveryType, a.operationMode || mapOperationMode(a.deliveryType), a.accountType, a.deliveryGroup,
+    a.today, a.yesterday, a.yesterdayCompare.toFixed(1)+"%",
+    a.monthTotal, a.lastMonthTotal, a.monthCompare.toFixed(1)+"%"
+  ]);
+  const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+  const BOM = "\uFEFF";
+  const blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `子账户消耗明细_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ==================== TOP10 ====================
+function renderTop10() {
+  var container = document.getElementById("top10Table");
+  if (!container) return;
+  var sorted = [...subAccounts].sort(function(a,b) { return b.yesterday - a.yesterday; }).slice(0, 10);
+  var totalYesterday = subAccounts.reduce(function(s, a) { return s + a.yesterday; }, 0);
+  container.innerHTML = '<table style="width:100%;font-size:12px;">' +
+    '<thead><tr><th>#</th><th>客户名</th><th>行业</th><th class="n">昨日消耗</th><th class="n">日环比</th><th class="n">占比</th></tr></thead>' +
+    '<tbody>' +
+    sorted.map((a,i) => {
+      const cls = a.yesterdayCompare >= 0 ? "change-up" : "change-down";
+      const sign = a.yesterdayCompare >= 0 ? "+" : "";
+      return '<tr>' +
+        '<td style="color:var(--text-secondary);font-weight:600;">' + (i+1) + '</td>' +
+        '<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + a.customerName + '">' + a.customerName + '</td>' +
+        '<td>' + a.industry + '</td>' +
+        '<td class="n" style="font-weight:500;">¥' + fmt(a.yesterday) + '</td>' +
+        '<td class="n ' + cls + '">' + sign + a.yesterdayCompare.toFixed(1) + '%</td>' +
+        '</tr>';
+    }).join("") +
+    '</tbody></table>';
+}
+
+
+// ==================== MONTHLY BREAKDOWN ====================
+function renderBimDeliveryType() {
+  var container = document.getElementById("bimDeliveryType");
+  if (!container) return;
+  var aggMonth = {}, aggLast = {}, aggToday = {}, aggYesterday = {};
+  DELIVERY_TYPES.forEach(function(t) { aggMonth[t] = 0; aggLast[t] = 0; aggToday[t] = 0; aggYesterday[t] = 0; });
+  subAccounts.forEach(function(a) {
+    if (aggMonth[a.deliveryType] !== undefined) {
+      aggMonth[a.deliveryType] += (a.monthTotal || 0);
+      aggLast[a.deliveryType] += (a.lastMonthTotal || 0);
+      aggToday[a.deliveryType] += (a.today || 0);
+      aggYesterday[a.deliveryType] += (a.yesterday || 0);
+    }
+  });
+  var entries = Object.keys(aggMonth).sort(function(a, b) { return aggMonth[b] - aggMonth[a]; });
+  var labels = entries;
+  var data = entries.map(function(n) { return Math.round(aggMonth[n] * 100) / 100; });
+  var total = data.reduce(function(s, v) { return s + v; }, 0);
+
+  // Build HTML with canvas + table
+  container.innerHTML =
+    '<div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">' +
+      '<div style="width:180px;height:180px;flex-shrink:0;"><canvas id="bimDonut"></canvas></div>' +
+      '<div style="flex:1;min-width:220px;" id="bimDeliveryTable"></div>' +
+    '</div>';
+
+  // Render donut chart
+  var ctx = document.getElementById("bimDonut");
+  if (ctx) {
+    if (window._bimDonutChart) window._bimDonutChart.destroy();
+    window._bimDonutChart = new Chart(ctx, {
+      type: "doughnut",
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: ["#5b5fcf", "#7c6faa", "#a89cc4"],
+          borderColor: "#fff",
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: "60%",
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                var pct = total > 0 ? (ctx.raw / total * 100).toFixed(1) : 0;
+                return ctx.label + ": " + pct + "% (¥" + fmt(ctx.raw) + ")";
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Render table
+  var tbl = document.getElementById("bimDeliveryTable");
+  if (!tbl) return;
+  var rows = entries.map(function(name) {
+    var m = aggMonth[name], lm = aggLast[name];
+    var chg = lm > 0 ? ((m - lm) / lm * 100).toFixed(1) : 0;
+    var cls = chg >= 0 ? "bim-change-up" : "bim-change-down";
+    var sign = chg >= 0 ? "+" : "";
+    var t = aggToday[name], y = aggYesterday[name];
+    return "<tr>" +
+      "<td>" + name + "</td>" +
+      "<td class='n'>&yen;" + fmt(t) + "</td>" +
+      "<td class='n'>&yen;" + fmt(y) + "</td>" +
+      "<td class='n'>&yen;" + fmt(m) + "</td>" +
+      "<td class='n'>&yen;" + fmt(lm) + "</td>" +
+      "<td class='n'><span class='" + cls + "'>" + sign + chg + "%</span></td>" +
+      "</tr>";
+  }).join("");
+  tbl.innerHTML = "<table class='bim-table'>" +
+    "<thead><tr><th>投放类型</th><th class='n'>今日消耗</th><th class='n'>昨日消耗</th><th class='n'>本月消耗</th><th class='n'>上月消耗</th><th class='n'>月环比</th></tr></thead>" +
+    "<tbody>" + rows + "</tbody></table>";
+}
+
+function renderBimIndustry() {
+  var container = document.getElementById("bimIndustry");
+  if (!container) return;
+  var aggMonth = {}, aggLast = {}, aggToday = {}, aggYesterday = {};
+  INDUSTRIES.forEach(function(t) { aggMonth[t] = 0; aggLast[t] = 0; aggToday[t] = 0; aggYesterday[t] = 0; });
+  subAccounts.forEach(function(a) {
+    if (aggMonth[a.industry] !== undefined) {
+      aggMonth[a.industry] += (a.monthTotal || 0);
+      aggLast[a.industry] += (a.lastMonthTotal || 0);
+      aggToday[a.industry] += (a.today || 0);
+      aggYesterday[a.industry] += (a.yesterday || 0);
+    }
+  });
+  var entries = Object.keys(aggMonth).sort(function(a, b) { return aggMonth[b] - aggMonth[a]; });
+  var rows = entries.map(function(name) {
+    var m = aggMonth[name], lm = aggLast[name], t = aggToday[name], y = aggYesterday[name];
+    var chg = lm > 0 ? ((m - lm) / lm * 100).toFixed(1) : 0;
+    var cls = chg >= 0 ? "bim-change-up" : "bim-change-down";
+    var sign = chg >= 0 ? "+" : "";
+    return "<tr>" +
+      "<td>" + name + "</td>" +
+      "<td class='n'>&yen;" + fmt(t) + "</td>" +
+      "<td class='n'>&yen;" + fmt(y) + "</td>" +
+      "<td class='n'>&yen;" + fmt(m) + "</td>" +
+      "<td class='n'>&yen;" + fmt(lm) + "</td>" +
+      "<td class='n'><span class='" + cls + "'>" + sign + chg + "%</span></td>" +
+      "</tr>";
+  }).join("");
+  container.innerHTML = "<table class='bim-table'>" +
+    "<thead><tr><th>行业</th><th class='n'>今日消耗</th><th class='n'>昨日消耗</th><th class='n'>本月消耗</th><th class='n'>上月消耗</th><th class='n'>月环比</th></tr></thead>" +
+    "<tbody>" + rows + "</tbody></table>";
+}
+
+// ==================== BIMONTHLY REBATE ====================
+function renderRebatePeriods() {
+  var sel = document.getElementById("rbPeriod");
+  if (!sel) return;
+  var current = state.rbPeriod || "";
+  var html = '<option value="">请选择双月周期</option>';
+  for (var i = 0; i < BIMONTHLY_PERIODS.length; i++) {
+    var p = BIMONTHLY_PERIODS[i];
+    html += '<option value="' + p + '"' + (current === p ? ' selected' : '') + '>' + p + '</option>';
+  }
+  sel.innerHTML = html;
+  sel.onchange = function() {
+    state.rbPeriod = sel.value;
+    renderRebateTable();
+  };
+  renderRebateTable();
+}function renderRebateTable() {
+  var period = state.rbPeriod;
+  var body = document.getElementById("rebateBody");
+  var empty = document.getElementById("rebateEmpty");
+  var summary = document.getElementById("rebateSummary");
+  var pagDiv = document.getElementById("rebatePagination");
+  
+  if (!body) return;
+  
+  // Hide everything first
+  if (empty) empty.style.display = "none";
+  if (summary) summary.innerHTML = "";
+  if (pagDiv) pagDiv.innerHTML = "";
+  body.innerHTML = "";
+  
+  if (!period) {
+    if (empty) empty.style.display = "block";
+    return;
+  }
+  
+  // Check rebateData
+  if (!rebateData || !rebateData.length) {
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-secondary);">数据生成中，请刷新页面重试</td></tr>';
+    return;
+  }
+  
+  // Filter
+  var filtered = [];
+  for (var i = 0; i < rebateData.length; i++) {
+    if (rebateData[i].period === period) filtered.push(rebateData[i]);
+  }
+  
+  if (filtered.length === 0) {
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-secondary);">该周期暂无数据</td></tr>';
+    return;
+  }
+  
+  // Pagination
+  var pageSize = state.rebatePageSize || 30;
+  var totalPages = Math.ceil(filtered.length / pageSize);
+  if (!state.rebatePage || state.rebatePage < 1 || state.rebatePage > totalPages) state.rebatePage = 1;
+  var start = (state.rebatePage - 1) * pageSize;
+  var end = Math.min(start + pageSize, filtered.length);
+  
+  // Build rows
+  var rowsHtml = '';
+  for (var j = start; j < end; j++) {
+    var r = filtered[j];
+    var diffClass = r.diff > 0.01 ? "change-up" : (r.diff < -0.01 ? "change-down" : "");
+    var diffSign = r.diff > 0.01 ? "+" : "";
+    var tierBg = r.tierRate === 0 ? "var(--bg)" : "var(--primary-light)";
+    var tierColor = r.tierRate === 0 ? "var(--text-secondary)" : "var(--primary)";
+    var rateStr = r.tierRate > 0 ? " (" + (r.tierRate * 100).toFixed(0) + "%)" : "";
+    var entShort = (r.entity && r.entity.length > 18) ? r.entity.substring(0, 18) + "..." : (r.entity || "-");
+    rowsHtml += '<tr>' +
+      '<td title="' + (r.entity || "") + '">' + entShort + '</td>' +
+      '<td>' + (r.customerName || "-") + '</td>' +
+      '<td>' + (r.subAccountName || "-") + '</td>' +
+      '<td>¥' + fmt(r.spend) + '</td>' +
+      '<td><span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:' + tierBg + ';color:' + tierColor + '">' + r.tierLabel + rateStr + '</span></td>' +
+      '<td class="n">' + (r.actualRate * 100).toFixed(2) + '%</td>' +
+      '<td class="n">' + (r.shouldRate * 100).toFixed(2) + '%</td>' +
+      '<td class="n ' + diffClass + '">' + diffSign + '¥' + fmt(Math.abs(r.diff)) + '</td>' +
+      '</tr>';
+  }
+  body.innerHTML = rowsHtml;
+  
+  // Summary
+  var totalSpend = 0, totalDiff = 0, needCount = 0;
+  for (var k = 0; k < filtered.length; k++) {
+    totalSpend += filtered[k].spend;
+    totalDiff += filtered[k].diff;
+    if (filtered[k].needsSupplement) needCount++;
+  }
+  if (summary) {
+    summary.innerHTML =
+      '<span>总消耗：<strong style="color:var(--text)">¥' + fmt(totalSpend) + '</strong></span>' +
+      '<span>待后补差额：<strong style="color:' + (totalDiff > 0 ? 'var(--danger)' : 'var(--success)') + '">¥' + fmt(Math.abs(totalDiff)) + '</strong></span>' +
+      '<span>需后补账户：<strong style="color:var(--danger)">' + needCount + ' 个</strong></span>';
+  }
+  
+  // Pagination
+  if (pagDiv && totalPages > 1) {
+    var pagesHtml = '';
+    for (var pi = 1; pi <= totalPages; pi++) {
+      pagesHtml += '<button class="page-btn' + (pi === state.rebatePage ? ' active' : '') + '" onclick="state.rebatePage=' + pi + ';renderRebateTable();">' + pi + '</button>';
+    }
+    pagDiv.innerHTML =
+      '<div style="display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text-secondary);">' +
+      '<span>共 ' + filtered.length + ' 条</span>' +
+      '<select style="padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;" onchange="state.rebatePageSize=parseInt(this.value);state.rebatePage=1;renderRebateTable();">' +
+      '<option value="30"' + (pageSize === 30 ? ' selected' : '') + '>30条/页</option>' +
+      '<option value="50"' + (pageSize === 50 ? ' selected' : '') + '>50条/页</option>' +
+      '</select></div>' +
+      '<div class="pagination-btns">' +
+      '<button class="page-btn" ' + (state.rebatePage <= 1 ? 'disabled' : '') + ' onclick="state.rebatePage=1;renderRebateTable();">«</button>' +
+      '<button class="page-btn" ' + (state.rebatePage <= 1 ? 'disabled' : '') + ' onclick="state.rebatePage=Math.max(1,state.rebatePage-1);renderRebateTable();">‹</button>' +
+      pagesHtml +
+      '<button class="page-btn" ' + (state.rebatePage >= totalPages ? 'disabled' : '') + ' onclick="state.rebatePage=Math.min(' + totalPages + ',state.rebatePage+1);renderRebateTable();">›</button>' +
+      '<button class="page-btn" ' + (state.rebatePage >= totalPages ? 'disabled' : '') + ' onclick="state.rebatePage=' + totalPages + ';renderRebateTable();">»</button>' +
+      '</div>';
+  }
+}function exportRebateCSV() {
+  var period = state.rbPeriod;
+  if (!period) return;
+  var filtered = rebateData.filter(function(r) { return r.period === period; });
+  var headers = ["主体","客户名","子账户名称","双月周期","上双月消耗","消耗所属档位","档位返点率","当时充值返点","按档位应给返点","应后补金额"];
+  var rows = filtered.map(function(r) {
+    return [
+      r.entity, r.customerName, r.subAccountName, r.period,
+      r.spend, r.tierLabel, (r.tierRate*100).toFixed(0)+"%",
+      (r.actualRate*100).toFixed(2)+"%", (r.shouldRate*100).toFixed(2)+"%",
+      r.diff.toFixed(2)
+    ];
+  });
+  var BOM = "\uFEFF";
+  var csv = [headers.join(",")].concat(rows.map(function(r){ return r.join(","); })).join("\n");
+  var blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = "双月返点核对_" + period + "_" + new Date().toISOString().slice(0,10) + ".csv";
+  a.click(); URL.revokeObjectURL(url);
+}function debounce(fn, ms) {
+
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
+
+function updateTime() {
+  const now = new Date();
+  document.getElementById("currentTime").textContent = now.toLocaleString("zh-CN", {
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+}
+
+// ==================== DATA MANAGEMENT ====================
+const STORAGE_KEY = "redbook_dashboard_data";
+const STORAGE_META_KEY = "redbook_dashboard_meta";
+
+function loadSavedData() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    var meta = localStorage.getItem(STORAGE_META_KEY);
+    if (!raw) return { loaded: false, meta: {} };
+    var parsed = JSON.parse(raw);
+    if (parsed.length > 0 && parsed[0].date !== undefined && parsed[0].spend !== undefined) {
+      rawRecords = parsed;
+      rebuildSubAccounts();
+      return { loaded: true, meta: meta ? JSON.parse(meta) : {} };
+    }
+    // Old format - clear it
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_META_KEY);
+    return { loaded: false, meta: {} };
+  } catch(e) {
+    console.warn("Failed to load saved data:", e);
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_META_KEY);
+    return { loaded: false, meta: {} };
+  }
+}
+
+function saveDataToStorage() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rawRecords));
+    localStorage.setItem(STORAGE_META_KEY, JSON.stringify({
+      savedAt: new Date().toISOString(),
+      count: subAccounts.length,
+    }));
+  } catch(e) { console.warn("Failed to save data:", e); }
+}
+
+function updateDataBarStatus() {
+  var dot = document.getElementById("dataStatusDot");
+  var text = document.getElementById("dataStatusText");
+  var resetBtn = document.getElementById("btnResetData");
+  if (!dot || !text) return;
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      if (parsed.length > 0 && parsed[0].date !== undefined && parsed[0].spend !== undefined) {
+        var meta = localStorage.getItem(STORAGE_META_KEY);
+        var m = meta ? JSON.parse(meta) : {};
+        dot.className = "status-dot real";
+        text.textContent = "已加载上传数据（" + parsed.length + " 条记录" + (m.savedAt ? "，保存于 " + new Date(m.savedAt).toLocaleString("zh-CN") : "") + "）";
+        if (resetBtn) resetBtn.style.display = "";
+        return;
+      }
+    }
+  } catch(e) {}
+  dot.className = "status-dot mock";
+  text.textContent = "已加载 Excel 账户数据";
+  if (resetBtn) resetBtn.style.display = "none";
+}
+
+function handleFileUpload(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var csv = e.target.result;
+      var lines = csv.split(/\r?\n/).filter(function(l) { return l.trim(); });
+      if (lines.length < 2) { alert("CSV 文件至少需要标题行和一行数据"); return; }
+      var headers = parseCSVLine(lines[0]);
+      var colMap = {};
+      headers.forEach(function(h, i) { colMap[h.trim()] = i; });
+      var required = ["子账户名称","日期","消耗"];
+      for (var ri = 0; ri < required.length; ri++) {
+        if (!(required[ri] in colMap)) { alert("CSV 缺少必要列：" + required[ri]); return; }
+      }
+      var records = [];
+      for (var i = 1; i < lines.length; i++) {
+        var vals = parseCSVLine(lines[i]);
+        if (vals.length < 2) continue;
+        function get(name, def) {
+          var idx = colMap[name];
+          return idx !== undefined && idx < vals.length ? vals[idx].trim() : def;
+        }
+        function getNum(name, def) { var v = parseFloat(get(name, "")); return isNaN(v) ? def : v; }
+        var dateStr = get("日期", "");
+        var spend = getNum("消耗", 0);
+        if (!dateStr || spend <= 0) continue;
+        records.push({
+          subAccountName: get("子账户名称", "子账户" + i),
+          customerName: get("客户名", "客户" + i),
+          profileName: get("专业号", ""),
+          entity: get("营业执照主体", ""),
+          group: get("来源", get("负责组别", "")),
+          industry: get("行业分类", ""),
+          profilePrimaryIndustry: get("专业号一级行业", ""),
+          profileSecondaryIndustry: get("专业号二级行业", ""),
+          deliveryType: get("投放类型", "自有代投"),
+          operationMode: (function(){
+            var rawCT = get("是否自运营", "");
+            if (rawCT) return rawCT;
+            var rawDT = get("投放类型", "自有代投");
+            return mapOperationMode(rawDT);
+          })(),
+          accountType: get("账户类型", "电商"),
+          deliveryGroup: get("投放组别", "投放1组"),
+          date: dateStr,
+          spend: spend
+        });
+      }
+      if (records.length === 0) { alert("未能从 CSV 解析出有效数据"); return; }
+      rawRecords = records;
+      rebuildSubAccounts();
+      saveDataToStorage();
+      updateDataBarStatus();
+      populateMonthSelector();
+      state.page = 1;
+      renderAll();
+    } catch(err) {
+      console.error(err);
+      alert("CSV 解析失败：" + err.message);
+    }
+  };
+  reader.readAsText(file, "UTF-8");
+  event.target.value = "";
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  var current = "", inQuotes = false;
+  for (var i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQuotes = !inQuotes; }
+    else if (ch === ',' && !inQuotes) { result.push(current); current = ""; }
+    else { current += ch; }
+  }
+  result.push(current);
+  return result;
+}
+
+function downloadTemplate() {
+  const headers = ["子账户名称","客户名","专业号","营业执照主体","来源","行业分类","专业号一级行业","专业号二级行业","投放类型","是否自运营","账户类型","投放组别","日期","消耗"];
+  const example = ["示例子账户1","示例客户","示例专业号","某某有限公司","华东一组","美妆个护","美妆","护肤","自有代投","运营（代投）","电商","投放1组","2025-06-01","5000.00"];
+  const BOM = "\uFEFF";
+  const csv = [headers.join(","), example.join(",")].join("\n");
+  const blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "小红书消耗数据模板_日期.csv";
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function resetToMockData() {
+  if (!confirm("确定要清除上传数据，恢复为模拟数据吗？")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STORAGE_META_KEY);
+  rawRecords = []; generateSubAccounts();
+  rebateData = generateRebateData(subAccounts);
+  updateDataBarStatus();
+  state.page = 1;
+  renderAll();
+}
+
+
+// ==================== TOP50 ====================
+function loadTop50Month() {
+  var sel = document.getElementById("top50MonthSel");
+  state.top50Month = sel ? sel.value : "";
+}
+function loadTop50Industry() {
+  var sel = document.getElementById("top50IndustrySel");
+  state.top50Industry = sel ? sel.value : "";
+}
+
+function renderTop50Toolbar() {
+  var months = [];
+  var now = new Date();
+  for (var i = 0; i < 5; i++) {
+    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,'0'));
+  }
+  var industries = [...new Set(subAccounts.map(function(a){ return a.industry; }))].filter(Boolean).sort();
+  var tb = document.getElementById("top50Toolbar");
+  if (!tb) return;
+  tb.innerHTML = 
+    '<div class="filter-group"><label>月份</label><select id="top50MonthSel" onchange="loadTop50Month();renderTop50();">' +
+    '<option value="">本月</option>' +
+    months.map(function(m){ return '<option value="'+m+'"'+(state.top50Month===m?' selected':'')+'>'+m+'</option>'; }).join("") +
+    '</select></div>' +
+    '<div class="filter-group"><label>行业</label><select id="top50IndustrySel" onchange="loadTop50Industry();renderTop50();">' +
+    '<option value="">全部</option>' +
+    industries.map(function(g){ return '<option value="'+g+'"'+(state.top50Industry===g?' selected':'')+'>'+g+'</option>'; }).join("") +
+    '</select></div>';
+}
+
+function renderTop50() {
+  var container = document.getElementById("top50Content");
+  if (!container) return;
+  renderTop50Toolbar();
+  // Aggregate by customer for selected month
+  var now = new Date();
+  var monthStr = state.top50Month || (now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0'));
+  var agg = {};
+  subAccounts.forEach(function(a){
+    var key = a.customerName;
+    if (!key) return;
+    if (state.top50Industry && a.industry !== state.top50Industry) return;
+    if (!agg[key]) agg[key] = { customerName: key, industry: a.industry, monthTotal: 0, yesterday: 0, yesterdayCompare: 0, subAccounts: [] };
+    agg[key].monthTotal += a.monthTotal;
+    agg[key].yesterday += a.yesterday;
+  });
+  // Recompute yesterdayCompare
+  var totalMonth = 0;
+  Object.values(agg).forEach(function(c){ totalMonth += c.monthTotal; });
+  var sorted = Object.values(agg).sort(function(a,b){ return b.monthTotal - a.monthTotal; }).slice(0, 50);
+  if (sorted.length === 0) {
+    container.innerHTML = '<div class="empty-state">暂无数据</div>';
+    return;
+  }
+  var html = '<table class="top50-table"><thead><tr><th>#</th><th>客户名</th><th>行业</th><th class="n">本月消耗</th><th class="n">昨日消耗</th><th class="n">占比</th></tr></thead><tbody>';
+  sorted.forEach(function(c, i){
+    var pct = totalMonth > 0 ? (c.monthTotal / totalMonth * 100).toFixed(1) : 0;
+    var isExp = state.expandedCustomer === c.customerName;
+    html += '<tr class="'+(isExp?'expanded':'')+'" onclick="toggleTop50Detail(\'' + c.customerName.replace(/'/g, "\\'") + '\')">' +
+      '<td style="color:var(--text-secondary);font-weight:600;">'+(i+1)+'</td>' +
+      '<td>' + c.customerName + '</td>' +
+      '<td>' + c.industry + '</td>' +
+      '<td class="n" style="font-weight:500;">' + fmt(c.monthTotal) + '</td>' +
+      '<td class="n">' + fmt(c.yesterday) + '</td>' +
+      '<td class="n">' + pct + '%</td>' +
+      '</tr>';
+    if (isExp) {
+      var subs = subAccounts.filter(function(a){ return a.customerName === c.customerName; });
+      subs.forEach(function(s){
+        html += '<tr class="sub-row"><td></td><td colspan="2">' + s.subAccountName + '</td>' +
+          '<td class="n">' + fmt(s.monthTotal) + '</td>' +
+          '<td class="n">' + fmt(s.yesterday) + '</td>' +
+          '<td class="n">' + (s.monthCompare >= 0 ? '+' : '') + s.monthCompare.toFixed(1) + '%</td></tr>';
+      });
+    }
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function toggleTop50Detail(name) {
+  if (state.expandedCustomer === name) { state.expandedCustomer = null; }
+  else { state.expandedCustomer = name; }
+  renderTop50();
+}
+
+// ==================== SELF-DELIVERY ====================
+function loadGroupKpis() {
+  if (window._groupKpis === undefined) {
+    var saved = localStorage.getItem("group_kpi_targets");
+    window._groupKpis = saved ? JSON.parse(saved) : {};
+  }
+  return window._groupKpis;
+}
+
+function setGroupKpi(groupName, val) {
+  var kpis = loadGroupKpis();
+  kpis[groupName] = parseFloat(val) || 0;
+  window._groupKpis = kpis;
+  localStorage.setItem("group_kpi_targets", JSON.stringify(kpis));
+  renderSelfDelivery();
+}
+// Generate SVG sparkline for last 30 days
+function makeSparkline(vals) {
+  vals = vals || [];
+  var w = 80, h = 20, pad = 1;
+  var max = 0;
+  for (var vi = 0; vi < vals.length; vi++) { if (vals[vi] > max) max = vals[vi]; }
+  if (max === 0) return '<svg width="'+w+'" height="'+h+'" style="display:block;"><line x1="'+pad+'" y1="'+(h-pad)+'" x2="'+(w-pad)+'" y2="'+(h-pad)+'" stroke="#e0e0e0" stroke-width="1"/></svg>';
+  var pts = '';
+  for (var vi = 0; vi < vals.length; vi++) {
+    var x = pad + (vi / Math.max(vals.length - 1, 1)) * (w - 2 * pad);
+    var y = h - pad - (vals[vi] / max) * (h - 2 * pad);
+    pts += x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+  }
+  return '<svg width="'+w+'" height="'+h+'" style="display:block;"><polyline points="'+pts.trim()+'" fill="none" stroke="var(--primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+
+function renderSelfDelivery() {
+  var container = document.getElementById("sdTable");
+  if (!container) return;
+  var kpis = loadGroupKpis();
+  // Aggregate 自有代投 accounts by deliveryGroup
+  var agg = {};
+  subAccounts.forEach(function(a){
+    if (a.deliveryType !== "自有代投") return;
+    var key = a.deliveryGroup || "未分组";
+    if (!agg[key]) { agg[key] = { group: key, today: 0, yesterday: 0, monthTotal: 0, lastMonthTotal: 0 }; }
+    agg[key].today += a.today;
+    agg[key].yesterday += a.yesterday;
+    agg[key].monthTotal += a.monthTotal;
+    agg[key].lastMonthTotal += a.lastMonthTotal;
+  });
+  var entries = Object.values(agg).sort(function(a,b){ return b.monthTotal - a.monthTotal; });
+  var totalMonth = entries.reduce(function(s,e){ return s + e.monthTotal; }, 0);
+  if (entries.length === 0) {
+    container.innerHTML = '<div class="empty-state">暂无自有代投数据</div>';
+    return;
+  }
+  // Compute last 30-day daily trend per group
+  var trendEnd = new Date(); trendEnd.setHours(0,0,0,0);
+  var trendStart = new Date(trendEnd); trendStart.setDate(trendStart.getDate() - 29);
+  var trendDates = [];
+  for (var d = new Date(trendStart); d <= trendEnd; d.setDate(d.getDate() + 1)) {
+    trendDates.push(d.toISOString().slice(0,10));
+  }
+  var groupTrend = {};
+  entries.forEach(function(e) { groupTrend[e.group] = trendDates.map(function(){ return 0; }); });
+  rawRecords.forEach(function(r) {
+    if (r.deliveryType !== "自有代投") return;
+    var g = r.deliveryGroup || "未分组";
+    var arr = groupTrend[g];
+    if (!arr) return;
+    var idx = trendDates.indexOf(r.date);
+    if (idx >= 0) arr[idx] += r.spend;
+  });
+  var html = '<table class="sd-table"><thead><tr>' +
+    '<th>投放组别</th><th>月KPI</th><th>KPI进度</th><th class="n">今日消耗</th><th class="n">昨日消耗</th><th class="n">日环比</th><th class="n">本月消耗</th><th class="n">上月消耗</th><th class="n">消耗占比</th><th class="n">近30天趋势</th>' +
+    '</tr></thead><tbody>';
+  entries.forEach(function(e){
+    var kpi = kpis[e.group] || 0;
+    var pct = kpi > 0 ? (e.monthTotal / kpi * 100) : 0;
+    var dayChg = e.yesterday > 0 ? ((e.today - e.yesterday) / e.yesterday * 100) : 0;
+    var share = totalMonth > 0 ? (e.monthTotal / totalMonth * 100) : 0;
+    var dayCls = dayChg >= 0 ? "change-up" : "change-down";
+    html += '<tr>' +
+      '<td>' + e.group + '</td>' +
+      '<td><input class="sd-kpi-input" type="number" value="' + (kpi || "") + '" placeholder="设置" onchange="setGroupKpi(\'' + e.group.replace(/'/g, "\\'") + '\', this.value)" onclick="event.stopPropagation()"></td>' +
+      '<td><div style="display:flex;align-items:center;gap:4px;"><div class="sd-bar" style="flex:1;"><div class="sd-bar-fill' + (pct > 100 ? ' over' : '') + '" style="width:' + Math.min(pct, 100) + '%"></div></div><span style="font-size:11px;">' + pct.toFixed(0) + '%</span></div></td>' +
+      '<td class="n">' + fmt(e.today) + '</td>' +
+      '<td class="n">' + fmt(e.yesterday) + '</td>' +
+      '<td class="n ' + dayCls + '">' + (dayChg >= 0 ? '+' : '') + dayChg.toFixed(1) + '%</td>' +
+      '<td class="n" style="font-weight:500;">' + fmt(e.monthTotal) + '</td>' +
+      '<td class="n">' + fmt(e.lastMonthTotal) + '</td>' +
+      '<td class="n">' + share.toFixed(1) + '%</td>' +
+      '<td class="n" style="padding:2px 4px;">' + makeSparkline(groupTrend[e.group]) + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// ==================== UPDATED TREND CHART ====================
+
+// ==================== SCHEDULED REFRESH ====================
+function scheduleRefresh() {
+  const now = new Date();
+  const target = new Date(now);
+  target.setHours(10, 0, 0, 0);
+  if (now >= target) target.setDate(target.getDate() + 1);
+  const delay = target - now;
+  setTimeout(() => {
+    loadSavedData().loaded ? renderAll() : (rawRecords = [], generateSubAccounts(), renderAll());
+    // After first trigger, repeat every 24h
+    setInterval(() => {
+      loadSavedData().loaded ? renderAll() : (rawRecords = [], generateSubAccounts(), renderAll());
+    }, 24 * 60 * 60 * 1000);
+  }, delay);
+  // Update badge
+  if (now.getHours() < 10) {
+    document.getElementById("refreshBadge").innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg> 等待 10:00 更新';
+  }
+}
+
+function renderAll() {
+  renderSummary();
+  renderKPI();
+  renderTrendChart();
+  renderFilters();
+  renderTable();
+  renderRebatePeriods();
+  populateMonthSelector();
+  renderTop10();
+  renderBimDeliveryType();
+  renderBimIndustry();
+  renderTop50();
+  renderSelfDelivery();
+  updateTime();
+  setTimeout(() => {
+    const btn = document.getElementById("btnExportRebate");
+    if (btn) btn.onclick = exportRebateCSV;
+  }, 100);
+}
+
+function scrollToSection(id, el) {
+  const target = document.getElementById(id);
+  if (target) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  el.classList.add('active');
+}
+
+// Init
+var saved = loadSavedData();
+if (!saved.loaded) {
+  rawRecords = []; generateSubAccounts();
+  rebateData = generateRebateData(subAccounts);
+}
+updateDataBarStatus();
+renderAll();
+scheduleRefresh();
+setInterval(updateTime, 1000);
+setTimeout(function() {
+  const tplBtn = document.getElementById("btnDownloadTemplate");
+  if (tplBtn) tplBtn.onclick = downloadTemplate;
+  const resetBtn = document.getElementById("btnResetData");
+  if (resetBtn) resetBtn.onclick = resetToMockData;
+}, 200);
+</script>
+</body>
+</html>
